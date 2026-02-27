@@ -2,7 +2,7 @@ import streamlit as st
 from google import genai
 from tavily import TavilyClient
 
-# ১. ওপরের গিটহাব লোগো এবং মেনু বার লুকানোর জন্য CSS কোড
+# ১. প্রফেশনাল লুকের জন্য CSS (লোগো হাইড করা)
 hide_st_style = """
             <style>
             #MainMenu {visibility: hidden;}
@@ -12,55 +12,63 @@ hide_st_style = """
             </style>
             """
 
-# ২. সিক্রেটস থেকে এপিআই কি নেওয়া
 try:
     GOOGLE_API_KEY = st.secrets["GOOGLE_API_KEY"]
     TAVILY_API_KEY = st.secrets["TAVILY_API_KEY"]
 except Exception:
-    st.error("API Key খুঁজে পাওয়া যায়নি। দয়া করে Streamlit Advanced Settings চেক করুন।")
+    st.error("API Key missing! Please check Streamlit Secrets.")
     st.stop()
 
-# ৩. ক্লায়েন্ট কনফিগারেশন
 client = genai.Client(api_key=GOOGLE_API_KEY)
 tavily = TavilyClient(api_key=TAVILY_API_KEY)
 
-# ৪. পেজ সেটিংস ও সিএসএস অ্যাপ্লাই
-st.set_page_config(page_title="AutoKaaj AI Search", page_icon="🔍")
+st.set_page_config(page_title="AutoKaaj Lead Agent", page_icon="💼")
 st.markdown(hide_st_style, unsafe_allow_html=True)
 
-st.title("🚀 AutoKaaj AI Search Engine")
-st.caption("কলকাতার লেটেস্ট তথ্য এবং স্মার্ট এআই উত্তর। Developed by Chiranjit Majumdar.")
+st.title("🎯 AutoKaaj High-Ticket Lead Finder")
+st.subheader("n8n, AI Agent ও ওয়েবসাইট প্রজেক্টের লিড খুঁজুন")
 
-# ৫. ইউজার ইনপুট ও প্রসেসিং
-query = st.text_input("আপনি কী জানতে চান?", placeholder="উদা: আজকে কলকাতায় সোনার দাম কত?")
+# ইনপুট অপশন
+platform = st.selectbox("কোন প্ল্যাটফর্ম থেকে লিড খুঁজবেন?", ["Upwork", "Fiverr", "LinkedIn", "Google Jobs"])
+category = st.text_input("কী ধরণের প্রজেক্ট খুঁজছেন?", placeholder="উদা: n8n automation, AI chatbot, Real estate website")
 
-if query:
-    with st.spinner("ইন্টারনেট থেকে লাইভ তথ্য খোঁজা হচ্ছে..."):
-        try:
-            # Tavily দিয়ে সার্চ
-            search_response = tavily.search(query=query, search_depth="advanced", max_results=5)
-            context = ""
-            sources = []
-            for r in search_response['results']:
-                context += f"Source: {r['url']}\nContent: {r['content']}\n\n"
-                sources.append(r)
-
-            # Gemini দিয়ে উত্তর তৈরি (আপনার বর্তমান সময় অনুযায়ী আপডেট করা)
-            prompt = f"আজকের তারিখ: ২৮ ফেব্রুয়ারি ২০২৬। Context: {context}\nQuestion: {query}\nAnswer in Bengali with proper formatting."
-            response = client.models.generate_content(model="gemini-2.0-flash", contents=prompt)
+if st.button("ফাইন্ড লিডস (Find Leads)"):
+    if category:
+        with st.spinner(f"{platform} থেকে আপনার জন্য কাজ খোঁজা হচ্ছে..."):
+            # বিশেষ সার্চ কুয়েরি যা নির্দিষ্ট প্ল্যাটফর্মকে টার্গেট করবে
+            lead_query = f"site:{platform.lower()}.com jobs {category} contact info or business names recently posted"
             
-            st.markdown("### 🤖 এআই উত্তর:")
+            search_response = tavily.search(query=lead_query, search_depth="advanced", max_results=10)
+            
+            context_leads = ""
+            for r in search_response['results']:
+                context_leads += f"Title: {r['title']}\nSnippet: {r['content']}\nURL: {r['url']}\n\n"
+
+            # এআই প্রম্পট - কাস্টমারের নাম ও নম্বর খুঁজে বের করার জন্য
+            prompt_leads = f"""
+            You are a professional Lead Generation Expert for an Automation Specialist.
+            Based on this context: {context_leads}
+            Identify 5 potential clients from {platform} who need {category}.
+            Extract the following for each:
+            1. Client/Business Name
+            2. Project/Job Description
+            3. Contact Link/Source URL
+            4. Estimated project value (if mentioned)
+            Note: If phone numbers aren't publicly visible on {platform}, provide their website or profile link for outreach.
+            Language: Bengali.
+            """
+            
+            response = client.models.generate_content(model="gemini-2.0-flash", contents=prompt_leads)
+            
+            st.markdown(f"### 🚀 {platform} থেকে প্রাপ্ত সম্ভাব্য লিডসমূহ:")
             st.write(response.text)
             
-            st.markdown("---")
-            st.markdown("#### 🔗 তথ্যসূত্র:")
-            for s in sources:
-                st.markdown(f"- [{s['title']}]({s['url']})")
-                
-        except Exception as e:
-            st.error(f"দুঃখিত, কোনো সমস্যা হয়েছে: {e}")
+            st.info("টিপস: ফ্রিল্যান্স সাইটে সরাসরি ফোন নম্বর পাওয়া কঠিন হতে পারে, তাই সোর্স লিঙ্কে গিয়ে সরাসরি বিড (Bid) করুন বা মেসেজ দিন।")
+    else:
+        st.warning("দয়া করে কাজের ক্যাটাগরি লিখুন।")
 
-# সাইডবার ইনফরমেশন
-st.sidebar.markdown("### বিজ্ঞাপনের জন্য যোগাযোগ")
-st.sidebar.write("Owner: Chiranjit Majumdar")
+# সাইডবার
+st.sidebar.title("AutoKaaj Automation")
+st.sidebar.write("Developed by: Chiranjit Majumdar")
+st.sidebar.write("Specialist: n8n & AI Agents")
 st.sidebar.write("Phone: 8910097747")
